@@ -15,6 +15,10 @@ def wikilang(attrname):
         return "item"
     elif attrname == "Table":
         return "table"
+    elif attrname == "Weight":
+        return "weight"
+    elif attrname == "Name":
+        return "table"
     else:
         return "error"
     
@@ -22,23 +26,27 @@ def torow(n):
     result = []
     for k in n:
         if k == "Blueprint":
-            temp = '{{ID to page|' + n[k] + '}} '
+            temp = '{{ID to page|' + n[k] + '}}'
         elif k == "Builder":
+            continue
+        elif k == "Hint":
             continue
         else:
             temp = n[k]
         result.append(wikilang(k) + '=' + temp) 
     return '{{EncounterTable/Row|' + '|'.join(result) + '}}'
-
-def totemplate(node):
+        
+def totemplate(node, template):
     objectarr = []
     tablearr = []
     for n in node.iter('object'):
         objectarr.append(torow(n.attrib))
     for n in node.iter('tableobject'):
         tablearr.append(torow(n.attrib))
+    for n in node.iter('table'):
+        tablearr.append(torow(n.attrib))
     merged = objectarr + tablearr
-    finalresult = '{{EncounterTable\n|' +'\n|'.join(merged) + '\n}}'
+    finalresult = '{{'+ template + '\n|' +'\n|'.join(merged) + '\n}}'
     #finalresult += '\n<noinclude>[[Category:Encounter Tables]]</noinclude>'
     return finalresult
 
@@ -69,7 +77,7 @@ def toconvo(node, title=None):
         else:
             qnum = 'quest'
             snum = 'step'
-            
+        row = []
         if n.get('UseID'):
             row = [f'UseID: {n.get("UseID")}']
         else:
@@ -87,43 +95,67 @@ def toconvo(node, title=None):
                 quest = n.get('StartQuest')
                 row.append(f'|{qnum}={quest}|{snum}=accept')
                 nquests = 2
-            
         qchoices.append('{{Qud dialogue:choice row\n' + '\n'.join(row) + '}}')
+        
     finalqchoices = '{{Qud dialogue:choice|\n' + '\n{{!}}-\n'.join(qchoices) + '}}'
     return qdialogue + '\n' + finalqchoices
-"""
-returns a specific encountertable formatted for the wiki.
 
-args parameters:
-  name   | the name of the encounter table
-"""
 def getencountertable(root, args):
+    """
+    returns a specific encountertable formatted for the wiki.
+    NOTE: builders and hints are ignored
+    
+    args parameters:
+      name   | the name of the encounter table
+    """
     tbl = []
     for node in root.iter('encountertable'):
         if (node.attrib.get('Name') == args['name']):
-            tbl.append(totemplate(node))
+            tbl.append(totemplate(node, 'EncounterTable'))
     return '\n'.join(tbl)
-"""
-returns the color templates formatted for the wiki.
-this doesn't use any args.
-"""
+
+
+def getpopulationtable(root, args):
+    """
+    returns a specific population table formatted for the wiki.
+    NOTE: builders and hints are ignored
+    
+    args parameters:
+      name   | the name of the population table
+    """
+    tbl = []
+    for node in root.iter('population'):
+        if (node.attrib.get('Name') == args['name']):
+            n = node.find('group')
+            if n.get('Style') == 'pickeach':
+                etstyle = '|roll=each'
+            else:
+                etstyle = '|roll=once'
+            tbl.append(totemplate(n, 'EncounterTable' + etstyle))
+    return '\n'.join(tbl)
+
 def getcolortable(root, args):
+    """
+    returns the color templates formatted for the wiki.
+    this doesn't use any args.
+    """
     temp = todict(root)
     final = []
     for e in temp:
         final.append("['" + e + "']={'" + temp[e][0] + "', '" + temp[e][1] + "'},")
     finalstr = '\n'.join(final)
     return finalstr
-"""
-returns an entire conversation formatted for the wiki.
 
-NOTE: UseID is not implemented yet. please check to make sure all UseIDs are properly replaced! 
-args parameters:
-  name   | the name of the convo id
-  title  | (optional) the title to set. the wiki by default uses the base page title. 
-           this is used if you want to override this.
-"""
 def getconversation(root, args):
+    """
+    returns an entire conversation formatted for the wiki.
+
+    NOTE: UseID is not implemented yet. please check to make sure all UseIDs are properly replaced! 
+    args parameters:
+      name   | the name of the convo id
+      title  | (optional) the title to set. the wiki by default uses the base page title. 
+               this is used if you want to override this.
+    """
     tbl = []
     for node in root.iter('conversation'):
         if (node.attrib.get('ID') == args['name']):
@@ -143,11 +175,13 @@ def main(tabletype, args):
     elif tabletype == 'conversation':
         filename = '\Conversations.xml'
         function = getconversation
+    elif tabletype == 'population':
+        filename = '\PopulationTables.xml'
+        function = getpopulationtable
     else:
         error('type not specified!')
     r = getbaseroot(baseloc, filename)
     print(function(r, args))
-
 """
 main takes 2 (sort of) arguments:
   tabletype: the xml type you want to read: (encounter, colors, conversation)
@@ -157,4 +191,4 @@ if __name__ = '__main__':
     args = {'name':'JoppaZealot',
        'title':'zealot of the Six Day Stilt'}
     main('conversation', args)
-                   
+    
