@@ -157,10 +157,14 @@ def getconversation(root, args):
                this is used if you want to override this.
     """
     tbl = []
+    if 'title' in args:
+        title = args['title']
+    else:
+        title = None
     for node in root.iter('conversation'):
         if (node.attrib.get('ID') == args['name']):
             for n in node.iter('node'):
-                tbl.append(toconvo(n, args['title'] or None))
+                tbl.append(toconvo(n, title))
     return '\n'.join(tbl)
 
 def main(tabletype, args):
