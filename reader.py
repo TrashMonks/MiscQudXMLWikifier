@@ -159,8 +159,7 @@ def getcolortable(root, args):
 def getconversation(root, args):
     """
     returns an entire conversation formatted for the wiki.
-
-    NOTE: UseID is not implemented yet. please check to make sure all UseIDs are properly replaced! 
+    
     args parameters:
       name   | the name of the convo id
       title  | (optional) the title to set. the wiki by default uses the base page title. 
