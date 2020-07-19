@@ -56,10 +56,14 @@ def todict(node):
         d[n.get('Name')] = [n.get('Colors'), n.get('Type')]
     return d
 
-def toconvo(node, title=None):
+def toconvo(node, title=None, ids=None):
     # {{Qud dialogue|nodetitle= | text= | title= }}
+    trimmedtextarr = node.find("text").text.splitlines()
+    for i in range(0, len(trimmedtextarr)):
+        trimmedtextarr[i] = trimmedtextarr[i].strip()
+    trimmedtext = '\n'.join(trimmedtextarr)
     qdialoguetbl = [f'|nodetitle={node.get("ID")}',
-                    f'|text={replaceshaders(node.find("text").text.strip())}']
+                    f'|text={replaceshaders(trimmedtext.strip())}']
     if title: 
         qdialoguetbl.append(f'|title={title}')
     qdialogue = '{{Qud dialogue' + "\n".join(qdialoguetbl) + '}}'
@@ -79,7 +83,7 @@ def toconvo(node, title=None):
             snum = 'step'
         row = []
         if n.get('UseID'):
-            row = [f'UseID: {n.get("UseID")}']
+            row = ids[n.get('UseID')]
         else:
             row = [f'|tonode={n.get("GotoID")}',
                    f'|text={n.text.strip()}']
@@ -95,6 +99,9 @@ def toconvo(node, title=None):
                 quest = n.get('StartQuest')
                 row.append(f'|{qnum}={quest}|{snum}=accept')
                 nquests = 2
+            convoid = n.get('ID')
+            if convoid not in ids:
+                ids[convoid] = row
         qchoices.append('{{Qud dialogue:choice row\n' + '\n'.join(row) + '}}')
         
     finalqchoices = '{{Qud dialogue:choice|\n' + '\n{{!}}-\n'.join(qchoices) + '}}'
