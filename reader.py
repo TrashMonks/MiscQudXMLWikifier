@@ -59,7 +59,7 @@ def todict(node):
 def toconvo(node, title=None):
     # {{Qud dialogue|nodetitle= | text= | title= }}
     qdialoguetbl = [f'|nodetitle={node.get("ID")}',
-                    f'|text={node.find("text").text.strip()}']
+                    f'|text={replaceshaders(node.find("text").text.strip())}']
     if title: 
         qdialoguetbl.append(f'|title={title}')
     qdialogue = '{{Qud dialogue' + "\n".join(qdialoguetbl) + '}}'
@@ -99,6 +99,9 @@ def toconvo(node, title=None):
         
     finalqchoices = '{{Qud dialogue:choice|\n' + '\n{{!}}-\n'.join(qchoices) + '}}'
     return qdialogue + '\n' + finalqchoices
+
+def replaceshaders(text):
+    return re.sub('({{)\s*(.+\s*\|.*}})', '\\1Qud shader no parse|\\2', text)
 
 def getencountertable(root, args):
     """
@@ -192,7 +195,6 @@ main takes 2 (sort of) arguments:
   args: a dictionary of arguments to pass which depend on the table type you select.
 """
 if __name__ = '__main__':
-    args = {'name':'JoppaZealot',
-       'title':'zealot of the Six Day Stilt'}
+    args = {'name':'JoppaZealot'}
     main('conversation', args)
     
