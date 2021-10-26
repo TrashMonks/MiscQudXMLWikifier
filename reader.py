@@ -154,7 +154,7 @@ def dictconversion(temp, arglen):
         parens = ['', '']
         if arglen > 1:
             parens = ['{', '}']
-            value = ', '.join(temp[e])
+            value = '\', \''.join(temp[e])
         else:
             value = temp[e]
         final.append(f"['{e}'] = {parens[0]}'{value}'{parens[1]}")
