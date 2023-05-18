@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import xml.etree.ElementTree as etree
+from copy import deepcopy
 import re
+import sys
+from lxml import etree
 import pyperclip
-
 
 baseloc = 'C:\Program Files (x86)\Steam\steamapps\common\Caves of Qud\CoQ_Data\StreamingAssets\Base'
 
@@ -76,9 +77,19 @@ def tocolordict(node):
         d[n.get('Name')] = [n.get('Colors'), n.get('Type')]
     return d
 
+def textof(node):
+    if (t:=node.find("text")) is not None:
+        result = t.text
+    else:
+        result = node.text
+    if result is None:
+        return ''
+    else:
+        return result
+
 def toconvo(node, title=None, ids=None):
     # {{Qud dialogue|nodetitle= | text= | title= }}
-    trimmedtextarr = node.find("text").text.splitlines()
+    trimmedtextarr = textof(node).splitlines()
     for i in range(0, len(trimmedtextarr)):
         trimmedtextarr[i] = trimmedtextarr[i].strip()
     trimmedtext = '\n'.join(trimmedtextarr)
@@ -97,6 +108,14 @@ def toconvo(node, title=None, ids=None):
         qchoices = []
         nquests = 1
         for n in node.iter('choice'):
+            if n.get('Load', '') == 'Remove':
+                for c in node.iter('choice'):
+                    if c.get('GoToID') == n.get('Target'):
+                        print('Removing', c.get('GoToID'), 'from', c.getparent().get('ID', 'unknown'))
+                        node.remove(c)
+                print('Done removing', n.get('Target'), 'from', n.getparent().get('ID', 'unknown'))
+                node.remove(n)
+        for n in node.iter('choice'):
             if nquests > 1:
                 qnum = 'quest2'
                 snum = 'step2'
@@ -108,7 +127,7 @@ def toconvo(node, title=None, ids=None):
                 row = ids[n.get('UseID')]
             else:
                 row = [f'|tonode={n.get("GotoID")}',
-                       f'|text={n.text.strip()}']
+                       f'|text={textof(n).strip()}']
                 if n.get('CompleteQuestStep'):
                     quest, step = n.get('CompleteQuestStep').split('~')
                     row.append(f'|{qnum}={quest}|{snum}={step}')
@@ -130,7 +149,7 @@ def toconvo(node, title=None, ids=None):
     return qdialogue + '\n' + finalqchoices
 
 def replaceshaders(text):
-    return re.sub('({{)\s*(.+\s*\|.*}})', '\\1Qud shader no parse|\\2', text)
+    return re.sub('({{)\s*([^}]+\s*\|[^}]*}})', '\\1Qud shader no parse|\\2', text, flags=re.S)
 
 def tobodypartvariantsdict(node):
     d = {}
@@ -197,16 +216,33 @@ def getcolortable(root, args):
     return dictconversion(temp, 2)
 
 def getconversation(root, args):
+    # tbl = ['{{Missing info|Needs conditionals on conversations manually filled in}}', '{{tocright}}']
     tbl = []
     ids = {}
     if 'title' in args:
         title = args['title']
     else:
         title = None
-    for node in root.iter('conversation'):
-        if (node.attrib.get('ID') == args['name']):
-            for n in node.iter('node'):
-                tbl.append(toconvo(n, title, ids))
+    for conv in root.iter('conversation'):
+        if (conv.get('ID') == args['name']):
+            nodes = {}
+            for node in conv.iter('node', 'start'):
+                nodes[node.get('ID')] = node
+            for node in conv.iter('node', 'start'):
+                inherits = node.get('Inherits', '')
+                if inherits in nodes:
+                    # print(node.get('ID'), 'inherits', inherits)
+                    for c in nodes[inherits].iter('choice', 'text'):
+                        if c.tag != 'text' or node.find('text') is None:
+                            node.append(deepcopy(c))
+            try:
+                for node in conv.iter('start'):
+                    tbl.append(toconvo(node, title, ids))
+                for node in conv.iter('node'):
+                    tbl.append(toconvo(node, title, ids))
+            except AttributeError as e:
+                print(f"Got attribute error on {conv.get('ID')}:{node.get('ID')}: {e}")
+                return ''
     return '\n'.join(tbl)
 
 def getbodytypevariants(root, args):
@@ -225,10 +261,6 @@ def getanatomies(root, args):
                 part['laterality'] if ('laterality' in part) else None))
     final.append('\n'.join(anatomy))
     return '\n'.join(final)
-
-
-# In[12]:
-
 
 def main(tabletype, args):
     function = lambda x: 'function is not set'
@@ -252,23 +284,32 @@ def main(tabletype, args):
         filename= '\Bodies.xml'
         function = getanatomies
     else:
-        error('type not specified!')
+        raise ValueError(f'{tabletype} is not a valid table type; '
+                         'use encounter, colors, conversation, population, bodyparts, and anatomies')
     r = getbaseroot(baseloc, filename)
     output = function(r, args)
+    with open('output.txt', 'w', encoding='utf-8') as file:
+        file.write(output)
+    print("Output saved in output.txt")
     pyperclip.copy(output)
-    print(output)
+    print("Output copied into clipboard.")
+    # print(output)
 
 # Main Function
 
-xmltype = input('Read from which table: [encounter|colors|conversation|population|bodyparts|anatomies]:\n')
-args = {}
-for arg in argsfortype(xmltype):
-    print(arg)
-    inputstr = input(f'Input {arg}: ')
-    args.update({arg: inputstr})
-
-main(xmltype, args)
-print("Output copied into clipboard.")
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        xmltype = sys.argv[1]
+    else:
+        xmltype = input('Read from which table: [encounter|colors|conversation|population|bodyparts|anatomies]:\n')
+    args = {}
+    for i, arg in enumerate(argsfortype(xmltype)):
+        if len(sys.argv) > 2 + i:
+            inputstr = sys.argv[2+i]
+        else:
+            inputstr = input(f'Input {arg}: ')
+        args.update({arg: inputstr})
+    main(xmltype, args)
 
 
 
