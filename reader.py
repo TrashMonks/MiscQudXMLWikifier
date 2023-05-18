@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from lxml import etree
 from copy import deepcopy
 import re
+import sys
+from lxml import etree
 import pyperclip
-import argparse
-
 
 baseloc = 'C:\Program Files (x86)\Steam\steamapps\common\Caves of Qud\CoQ_Data\StreamingAssets\Base'
 
@@ -230,10 +229,9 @@ def getconversation(root, args):
             for node in conv.iter('node', 'start'):
                 nodes[node.get('ID')] = node
             for node in conv.iter('node', 'start'):
-                node_id = node.get('ID')
                 inherits = node.get('Inherits', '')
                 if inherits in nodes:
-                    # print(node_id, 'inherits', inherits)
+                    # print(node.get('ID'), 'inherits', inherits)
                     for c in nodes[inherits].iter('choice', 'text'):
                         if c.tag != 'text' or node.find('text') is None:
                             node.append(deepcopy(c))
@@ -300,18 +298,14 @@ def main(tabletype, args):
 # Main Function
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='MiscQudXMLWikifier')
-    parser.add_argument('xmltype')
-    parser.add_argument('-n', '--name')
-    cmd_args = vars(parser.parse_args())
-    if 'xmltype' in cmd_args:
-        xmltype = cmd_args['xmltype']
+    if len(sys.argv) > 1:
+        xmltype = sys.argv[1]
     else:
         xmltype = input('Read from which table: [encounter|colors|conversation|population|bodyparts|anatomies]:\n')
     args = {}
-    for arg in argsfortype(xmltype):
-        if arg in cmd_args:
-            inputstr = cmd_args[arg]
+    for i, arg in enumerate(argsfortype(xmltype)):
+        if len(sys.argv) > 2 + i:
+            inputstr = sys.argv[2+i]
         else:
             inputstr = input(f'Input {arg}: ')
         args.update({arg: inputstr})
