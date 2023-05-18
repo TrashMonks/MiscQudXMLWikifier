@@ -87,14 +87,83 @@ def textof(node):
     else:
         return result
 
+conditions = {
+    'IfFinishedQuest': lambda q: f"the player has completed [[{q}]]",
+    'IfFinishedQuestStep': lambda q: f"the player has completed [[{q.split('~')[0]}#{q.split('~')[1]}|{q.split('~')[1]}]]",
+    'IfHaveActiveQuest': lambda q: f"[[{q}]] is active",
+    'IfHaveBlueprint': lambda q: "the player is carrying {{f|" + q + "}} TODO make noun definite if needed",
+    'IfHaveObservation': lambda q: f"the player has learned that TODO[explain {q}]",
+    'IfHavePart': lambda q: "the player has {{f|" + q + "}}", # this is currently only used for mutations, may need to change in future
+    'IfHaveQuest': lambda q: f"the player has accepted [[{q}]]",
+    'IfHaveState': lambda q: f"TODO[explain what condition {q} is]",
+    'IfHaveSultanNoteWithTag': lambda q: f"the player has learned that TODO[explain {q}]",
+    'IfHaveText': lambda q: f"the option above contains the text {q} TODO delete if this is not true",
+    'IfHaveVillageNote': lambda q: f"the player has learned that TODO[explain {q}]",
+    'IfHindriarch': lambda q: f"{q} is Hindriarch",
+    'IfLastChoice': lambda q: f"the last choice taken was {q} TODO restructure this",
+    'IfLevelLessOrEqual': lambda q: f"the player's level is less than or equal to {q}",
+    'IfNotFinishedQuest': lambda q: f"the player hasn't completed [[{q}]]",
+    'IfNotFinishedQuestStep': lambda q: f"the player hasn't completed [[{q.split('~')[0]}#{q.split('~')[1]}|{q.split('~')[1]}]]",
+    'IfNotHaveObservation': lambda q: f"the player hasn't learned that TODO[{q}]",
+    'IfNotHavePart': lambda q: "the player doesn't have {{f|" + q + "}}", # this is currently only used for mutations, may need to change in future
+    'IfNotHaveQuest': lambda q: f"the player hasn't accepted [[{q}]]",
+    'IfNotHaveState': lambda q: f"TODO[explain what condition not having {q} is]",
+    'IfNotReputationAtLeast': lambda q: f"the player's reputation isn't at least {q}",
+    'IfNotSlynthCandidate': lambda q: f"[[{q}]] isn't a candidate for the [[Slynth]] settlement TODO grammar",
+    'IfNotWearingBlueprint': lambda q: "the player is not wearing {{f|" + q + "}} TODO grammar",
+    'IfReputationAtLeast': lambda q: f"the player's reputation is at least {q}",
+    'IfSlynthCandidate': lambda q: f"[[{q}]] is a candidate for the [[Slynth]] settlement TODO grammar ",
+    'IfSlynthChosen': lambda q: f"[[{q}]] was chosen for the [[Slynth]] settlement TODO grammar",
+    'IfSpeakerHavePart': lambda q: f"TODO[explain the condition of the speaker having {q} part]",
+    'IfSpeakerHaveTagOrProperty': lambda q: f"TODO[explain the condition of the speaker having {q} tag/prop]",
+    'IfSpeakerNotHaveProperty': lambda q: f"TODO[explain the condition of the speaker not having {q} prop]",
+    'IfTestState': lambda q: f"TODO[explain what condition test state {q} is]",
+    'IfTrueKin': lambda q: "the player is a [[True Kin]]",
+    'IfWearingBlueprint': lambda q: "the player is wearing {{f|" + q + "}} TODO grammar",
+}
+replacements = {}
+
+def getcondition(node):
+    requirements = []
+    todo_block = re.compile(r'TODO\[[^\]]*\]')
+    for attr, val in node.attrib.items():
+        if attr in conditions:
+            cond = conditions[attr](val)
+            # match = re.search(todo_block, cond)
+            # print(cond, '|', match)
+            if match := re.search(todo_block, cond):
+                todotext = match.group()
+                print(todotext, replacements)
+                if todotext in replacements:
+                    answer = replacements[todotext]
+                else:
+                    print('Enter a replacement for the TODO block in this statement:')
+                    answer = input(cond + '\n')
+                    replacements[todotext] = answer
+                    print(replacements)
+                cond = re.sub(todo_block, answer, cond)
+                print('Final result:', cond)
+            requirements.append(cond)
+    if requirements:
+        return 'Only available if ' + ' and '.join(requirements)
+    else:
+        return None
+
+
+    
+
 def toconvo(node, title=None, ids=None):
     # {{Qud dialogue|nodetitle= | text= | title= }}
+    condition = getcondition(node)
     trimmedtextarr = textof(node).splitlines()
     for i in range(0, len(trimmedtextarr)):
         trimmedtextarr[i] = trimmedtextarr[i].strip()
     trimmedtext = '\n'.join(trimmedtextarr)
-    qdialoguetbl = [f'|nodetitle={node.get("ID")}',
-                    f'|text={replaceshaders(trimmedtext.strip())}']
+    if condition:
+        qdialoguetbl = [f'|nodetitle={node.get("ID")} ({condition})']
+    else:
+        qdialoguetbl = [f'|nodetitle={node.get("ID")}']
+    qdialoguetbl.append(f'|text={replaceshaders(trimmedtext.strip())}')
     if title: 
         qdialoguetbl.append(f'|title={title}')
     qdialogue = '{{Qud dialogue' + "\n".join(qdialoguetbl) + '}}'
@@ -103,6 +172,7 @@ def toconvo(node, title=None, ids=None):
     # {{Qud dialogue:choice row|tonode=end
     # |text=testing, testing!|end= true}}
     # {{!}}-}} UseID
+    
     finalqchoices = ""
     if True:
         qchoices = []
@@ -128,6 +198,9 @@ def toconvo(node, title=None, ids=None):
             else:
                 row = [f'|tonode={n.get("GotoID")}',
                        f'|text={textof(n).strip()}']
+                condition = getcondition(n)
+                if condition:
+                    row.append(f'|comment={condition}')
                 if n.get('CompleteQuestStep'):
                     quest, step = n.get('CompleteQuestStep').split('~')
                     row.append(f'|{qnum}={quest}|{snum}={step}')
@@ -216,8 +289,8 @@ def getcolortable(root, args):
     return dictconversion(temp, 2)
 
 def getconversation(root, args):
-    # tbl = ['{{Missing info|Needs conditionals on conversations manually filled in}}', '{{tocright}}']
-    tbl = []
+    tbl = ['{{Missing info|May need to be ordered properly, also needs TODOs filled in}}', '{{tocright}}']
+    # tbl = []
     ids = {}
     if 'title' in args:
         title = args['title']
@@ -290,6 +363,7 @@ def main(tabletype, args):
     output = function(r, args)
     with open('output.txt', 'w', encoding='utf-8') as file:
         file.write(output)
+        file.write('\n')
     print("Output saved in output.txt")
     pyperclip.copy(output)
     print("Output copied into clipboard.")
