@@ -6,6 +6,7 @@ import re
 import sys
 from lxml import etree
 import pyperclip
+import json
 
 baseloc = 'C:\Program Files (x86)\Steam\steamapps\common\Caves of Qud\CoQ_Data\StreamingAssets\Base'
 
@@ -121,8 +122,46 @@ conditions = {
     'IfTrueKin': lambda q: "the player is a [[True Kin]]",
     'IfWearingBlueprint': lambda q: "the player is wearing {{f|" + q + "}} TODO grammar",
 }
-replacements = {}
 
+class Replacer:
+    def __init__(self, trust=True) -> None:
+        try:
+            with open('replacements.json', 'r', encoding='utf-8') as file:
+                if trust:
+                    self.confirmed_replacements = json.load(file)
+                    self.saved_replacements = {}
+                else:
+                    self.saved_replacements = json.load(file)
+                    self.confirmed_replacements = {}
+        except:
+            print('Could not load replacements.json')
+            self.saved_replacements = {}
+            self.confirmed_replacements = {}
+    
+    def get(self, key, sentence=''):
+        if key in self.confirmed_replacements:
+            answer = self.confirmed_replacements[key]
+        elif key in self.saved_replacements:
+            answer = self.saved_replacements[key]
+            confirm = input(f'Got saved answer of "{answer}" for {key}; hit Enter to confirm or input new answer')
+            if confirm == '':
+                answer = confirm
+            self.confirmed_replacements[key] = answer
+        else:
+            print('Enter a replacement for the TODO block in this statement:')
+            if sentence:
+                prompt = sentence + '\n'
+            else:
+                prompt = key + '\n'
+            answer = input(prompt)
+            self.confirmed_replacements[key] = answer
+        with open('replacements.json', 'w', encoding='utf-8') as file:
+            json.dump(self.saved_replacements | self.confirmed_replacements, file)
+        return answer
+
+
+replacements = Replacer()
+ 
 def getcondition(node):
     requirements = []
     todo_block = re.compile(r'TODO\[[^\]]*\]')
@@ -133,24 +172,14 @@ def getcondition(node):
             # print(cond, '|', match)
             if match := re.search(todo_block, cond):
                 todotext = match.group()
-                print(todotext, replacements)
-                if todotext in replacements:
-                    answer = replacements[todotext]
-                else:
-                    print('Enter a replacement for the TODO block in this statement:')
-                    answer = input(cond + '\n')
-                    replacements[todotext] = answer
-                    print(replacements)
+                answer = replacements.get(todotext, cond)
                 cond = re.sub(todo_block, answer, cond)
-                print('Final result:', cond)
+                # print(f'Replacing {todotext} with {cond}')
             requirements.append(cond)
     if requirements:
         return 'Only available if ' + ' and '.join(requirements)
     else:
         return None
-
-
-    
 
 def toconvo(node, title=None, ids=None):
     # {{Qud dialogue|nodetitle= | text= | title= }}
