@@ -209,10 +209,22 @@ def toconvo(node, title=None, ids=None):
         for n in node.iter('choice'):
             if n.get('Load', '') == 'Remove':
                 for c in node.iter('choice'):
-                    if c.get('GoToID') == n.get('Target'):
+                    #starfungus: this if statement is confusing to me. it seemed to only ever break things
+                    #so i made it check to see if the c GoToID is None first. this seemed to stop the breaking
+                    #but i don't know if it works as intended?
+                    if c.get('GoToID') == n.get('Target') and c.get('GoToID') is not None:
                         print('Removing', c.get('GoToID'), 'from', c.getparent().get('ID', 'unknown'))
                         node.remove(c)
                 print('Done removing', n.get('Target'), 'from', n.getparent().get('ID', 'unknown'))
+                node.remove(n)
+            #check for both GoToID and Target, because they're synonyms.
+            #this bit removes choices that point to the current node's ID, which is most common when
+            #they get inherited. They are not visible in-game
+            if n.get('GoToID') == node.get('ID') and n.get('GoToID') is not None:
+                print('Removing self-referential', n.get('GoToID'), 'from', n.getparent().get('ID', 'unknown'))
+                node.remove(n)
+            if n.get('Target') == node.get('ID') and n.get('Target') is not None:
+                print('Removing self-referential', n.get('Target'), 'from', n.getparent().get('ID', 'unknown'))
                 node.remove(n)
         for n in node.iter('choice'):
             if nquests > 1:
@@ -225,8 +237,13 @@ def toconvo(node, title=None, ids=None):
             if n.get('UseID'):
                 row = ids[n.get('UseID')]
             else:
-                row = [f'|tonode={n.get("GotoID")}',
-                       f'|text={textof(n).strip()}']
+                #check for both GoToID and Target, because they're synonyms.
+                if n.get("GotoID") is not None:
+                    row = [f'|tonode={n.get("GotoID")}',
+                           f'|text={textof(n).strip()}']
+                else:
+                    row = [f'|tonode={n.get("Target")}',
+                           f'|text={textof(n).strip()}']
                 condition = getcondition(n)
                 if condition:
                     row.append(f'|comment={condition}')
