@@ -4,11 +4,23 @@
 from copy import deepcopy
 import re
 import sys
-from lxml import etree
+try:
+    from lxml import etree
+except ImportError:
+    import xml.etree.ElementTree as etree
 import pyperclip
 import json
 
-baseloc = 'C:\Program Files (x86)\Steam\steamapps\common\Caves of Qud\CoQ_Data\StreamingAssets\Base'
+from colors import get_shader_list, get_color_dict
+
+OS = "linux"
+
+if OS == "windows":
+    baseloc = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Caves of Qud\\CoQ_Data\\StreamingAssets\\Base'
+    slash = "\\"
+else:
+    baseloc = "/home/(you)/.steam/steam/steamapps/common/Caves of Qud/CoQ_Data/StreamingAssets/Base"
+    slash = "/"
 
 
 # Helper Functions
@@ -16,7 +28,7 @@ baseloc = 'C:\Program Files (x86)\Steam\steamapps\common\Caves of Qud\CoQ_Data\S
 def argsfortype(xmltype):
     if (xmltype == "conversation"):
         return ["name"]  # TODO: add optional "title" argument override
-    elif (xmltype == "colors" or xmltype == "bodyparts"):
+    elif (xmltype == "colors" or xmltype == "bodyparts" or xmltype == "colorscss"):
         return []
     else:
         return ["name"]
@@ -71,12 +83,6 @@ def totemplate(node, template):
     finalresult = '{{'+ template + '\n|' +'\n|'.join(merged) + '\n}}'
     #finalresult += '\n<noinclude>[[Category:Encounter Tables]]</noinclude>'
     return finalresult
-
-def tocolordict(node):
-    d = {}
-    for n in node.iter('shader'):
-        d[n.get('Name')] = [n.get('Colors'), n.get('Type')]
-    return d
 
 def textof(node):
     if (t:=node.find("text")) is not None:
@@ -305,7 +311,6 @@ def anatomytemplate(name, _type, laterality):
         s += f"|laterality={laterality}"
     s += '}}'
     return  s
-           
 
 
 # Main "get" functions
@@ -329,9 +334,12 @@ def getpopulationtable(root, args):
                 etstyle = '|roll=once'
             tbl.append(totemplate(n, 'EncounterTable' + etstyle))
     return f"=== {args['name']} ===\n" + '\n'.join(tbl)
-    
+
+def getshaderlist(root, args):
+    return get_shader_list(root)
+
 def getcolortable(root, args):
-    temp = tocolordict(root)
+    temp = get_color_dict(root)
     return dictconversion(temp, 2)
 
 def getconversation(root, args):
@@ -385,22 +393,25 @@ def main(tabletype, args):
     function = lambda x: 'function is not set'
     filename = ''
     if tabletype =='encounter':
-        filename = '\EncounterTables.xml'
+        filename = f'{slash}EncounterTables.xml'
         function = getencountertable
     elif tabletype == 'colors':
-        filename = '\Colors.xml'
+        filename = f'{slash}Colors.xml'
         function = getcolortable
+    elif tabletype == "colorscss":
+        filename = f"{slash}Colors.xml"
+        function = getshaderlist
     elif tabletype == 'conversation':
-        filename = '\Conversations.xml'
+        filename = f'{slash}Conversations.xml'
         function = getconversation
     elif tabletype == 'population':
-        filename = '\PopulationTables.xml'
+        filename = f'{slash}PopulationTables.xml'
         function = getpopulationtable
     elif tabletype == 'bodyparts':
-        filename= '\Bodies.xml'
+        filename= f'{slash}Bodies.xml'
         function = getbodytypevariants
     elif tabletype == 'anatomies':
-        filename= '\Bodies.xml'
+        filename= f'{slash}Bodies.xml'
         function = getanatomies
     else:
         raise ValueError(f'{tabletype} is not a valid table type; '
@@ -430,6 +441,5 @@ if __name__ == '__main__':
             inputstr = input(f'Input {arg}: ')
         args.update({arg: inputstr})
     main(xmltype, args)
-
 
 
